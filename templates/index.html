@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mantis BT - Web Edition</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <!-- Header Navbar -->
+  <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded bg-amber-500 flex items-center justify-center font-black text-slate-900">M</div>
+      <h1 class="text-xl font-bold tracking-wide">Mantis Bug Tracker</h1>
+    </div>
+    <div class="flex items-center space-x-4">
+      <button onclick="openNewModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg shadow transition">
+        + Report Issue
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto p-6 space-y-6">
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4" id="status-cards">
+      <!-- Dynamically populated via JavaScript -->
+    </div>
+
+    <!-- Ticket Table -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-xl">
+      <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+        <h2 class="font-semibold text-lg text-slate-200">Active Issues</h2>
+        <button onclick="loadTickets()" class="text-xs text-amber-400 hover:underline">Refresh Data</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-300">
+          <thead class="bg-slate-900/60 text-slate-400 uppercase text-xs">
+            <tr>
+              <th class="p-4">ID</th>
+              <th class="p-4">Project</th>
+              <th class="p-4">Severity</th>
+              <th class="p-4">Status</th>
+              <th class="p-4">Summary</th>
+              <th class="p-4">Assignee</th>
+              <th class="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ticket-table-body" class="divide-y divide-slate-700/50">
+            <tr><td colspan="7" class="p-6 text-center text-slate-400">Loading issues...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- New Issue Modal -->
+  <div id="new-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-xl p-6 space-y-4">
+      <h3 class="text-xl font-bold text-slate-100">Report New Bug</h3>
+      <form id="bug-form" onsubmit="handleCreate(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs uppercase text-slate-400 mb-1">Summary</label>
+          <input id="form-summary" type="text" required class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs uppercase text-slate-400 mb-1">Project</label>
+            <input id="form-project" type="text" value="Core Platform" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-100">
+          </div>
+          <div>
+            <label class="block text-xs uppercase text-slate-400 mb-1">Severity</label>
+            <select id="form-severity" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-100">
+              <option value="Minor">Minor</option>
+              <option value="Major">Major</option>
+              <option value="Crash">Crash</option>
+              <option value="Blocker">Blocker</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs uppercase text-slate-400 mb-1">Description</label>
+          <textarea id="form-description" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-100"></textarea>
+        </div>
+        <div class="flex justify-end space-x-3 pt-2">
+          <button type="button" onclick="closeNewModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-slate-200">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-white font-medium">Submit Ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let tickets = [];
+
+    async function loadTickets() {
+      try {
+        const res = await fetch('/api/tickets');
+        tickets = await res.json();
+        render();
+      } catch (e) {
+        console.error('API Error:', e);
+      }
+    }
+
+    function render() {
+      const tbody = document.getElementById('ticket-table-body');
+      if (!tickets.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-400">No issues recorded yet. Click "+ Report Issue" above.</td></tr>';
+      } else {
+        tbody.innerHTML = tickets.map(t => `
+          <tr class="hover:bg-slate-7/30">
+            <td class="p-4 font-mono text-amber-400">#${t.id}</td>
+            <td class="p-4">${t.project}</td>
+            <td class="p-4"><span class="px-2 py-1 text-xs rounded bg-slate-700">${t.severity}</span></td>
+            <td class="p-4"><span class="px-2 py-1 text-xs rounded font-medium ${getStatusBadge(t.status)}">${t.status}</span></td>
+            <td class="p-4 font-medium text-slate-100">${escapeHtml(t.summary)}</td>
+            <td class="p-4 text-slate-400">${t.assigned_to}</td>
+            <td class="p-4 text-right space-x-2">
+              <button onclick="deleteTicket(${t.id})" class="text-red-400 hover:underline text-xs">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // Render summary cards
+      const counts = { New: 0, Assigned: 0, Resolved: 0, Closed: 0 };
+      tickets.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
+      
+      document.getElementById('status-cards').innerHTML = Object.entries(counts).map(([k, v]) => `
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
+          <div class="text-2xl font-bold text-slate-100">${v}</div>
+          <div class="text-xs text-slate-400 uppercase tracking-wider mt-1">${k}</div>
+        </div>
+      `).join('');
+    }
+
+    function getStatusBadge(status) {
+      switch (status) {
+        case 'New': return 'bg-rose-950 text-rose-300 border border-rose-800';
+        case 'Assigned': return 'bg-blue-950 text-blue-300 border border-blue-800';
+        case 'Resolved': return 'bg-emerald-950 text-emerald-300 border border-emerald-800';
+        default: return 'bg-slate-800 text-slate-300';
+      }
+    }
+
+    async function handleCreate(e) {
+      e.preventDefault();
+      const payload = {
+        summary: document.getElementById('form-summary').value,
+        project: document.getElementById('form-project').value,
+        severity: document.getElementById('form-severity').value,
+        description: document.getElementById('form-description').value
+      };
+      await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      closeNewModal();
+      document.getElementById('bug-form').reset();
+      loadTickets();
+    }
+
+    async function deleteTicket(id) {
+      if (!confirm('Delete ticket #' + id + '?')) return;
+      await fetch('/api/tickets/' + id, { method: 'DELETE' });
+      loadTickets();
+    }
+
+    function openNewModal() { document.getElementById('new-modal').classList.remove('hidden'); }
+    function closeNewModal() { document.getElementById('new-modal').classList.add('hidden'); }
+    function escapeHtml(str) { return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''; }
+
+    window.addEventListener('DOMContentLoaded', loadTickets);
+  </script>
+</body>
+</html>
